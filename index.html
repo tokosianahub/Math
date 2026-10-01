@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Hitung Cepat</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            /* Latar belakang gradient yang menarik untuk anak-anak/game */
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        h1, h2, .question-text {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        /* Styling untuk container utama game */
+        .game-container {
+            background-color: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Styling dasar untuk tombol pilihan ganda */
+        .option-btn {
+            transition: all 0.2s ease-in-out;
+            transform: translateY(0);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* Efek hover untuk tombol */
+        .option-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 7px 14px rgba(0,0,0,0.15);
+        }
+
+        /* Efek klik untuk tombol */
+        .option-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Animasi Pop In untuk elemen yang baru muncul */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-pop-in {
+            animation: popIn 0.5s ease-out forwards;
+        }
+
+        /* Animasi Goyang (Shake) saat jawaban salah */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+            20%, 40%, 60%, 80% { transform: translateX(10px); }
+        }
+
+        .animate-shake {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+            border-color: #ef4444 !important; /* Merah Tailwind */
+            background-color: #fee2e2 !important;
+            color: #b91c1c !important;
+        }
+
+        /* Animasi Sukses (Bounce) saat jawaban benar */
+        @keyframes successBounce {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); background-color: #22c55e; color: white;} /* Hijau Tailwind */
+            100% { transform: scale(1); background-color: #22c55e; color: white;}
+        }
+
+        .animate-success {
+            animation: successBounce 0.5s ease-in-out forwards;
+            border-color: #22c55e !important;
+        }
+
+        /* Overlay untuk animasi notifikasi (Benar/Salah) */
+        #notification-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            pointer-events: none; /* Agar tidak menghalangi klik di bawahnya */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* Styling konten notifikasi */
+        .notification-content {
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+            transform: scale(0.8);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+
+        #notification-overlay.show {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        #notification-overlay.show .notification-content {
+            transform: scale(1);
+        }
+
+        /* Teks besar pada notifikasi */
+        .notification-text {
+            font-size: 3rem;
+            font-weight: bold;
+            font-family: 'Fredoka One', cursive;
+            margin-bottom: 0.5rem;
+        }
+        
+        .notification-subtext {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Warna spesifik untuk notifikasi sukses */
+        .success-theme {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #064e3b;
+            border: 4px solid #10b981;
+        }
+
+        /* Warna spesifik untuk notifikasi gagal */
+        .error-theme {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+            color: #7f1d1d;
+            border: 4px solid #ef4444;
+        }
+        
+        /* Partikel Confetti sederhana (menggunakan CSS untuk ilustrasi, JS bisa lebih kompleks) */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #fcd34d;
+            opacity: 0;
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Layar Utama Permainan -->
+    <div id="game-screen" class="game-container animate-pop-in">
+        <!-- Header: Judul dan Progress -->
+        <div class="mb-6 flex justify-between items-center border-b pb-4">
+            <h1 class="text-2xl text-blue-600">Ayo Berhitung!</h1>
+            <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold text-sm">
+                Soal <span id="current-question-num">1</span>/5
+            </div>
+        </div>
+
+        <!-- Area Pertanyaan -->
+        <div class="mb-8">
+            <h2 class="text-gray-500 mb-2 font-bold text-lg uppercase tracking-wider">Berapa hasil dari:</h2>
+            <div id="question-display" class="question-text text-6xl text-gray-800 my-4 drop-shadow-sm">
+                <!-- Soal akan dimasukkan ke sini oleh JS -->
+            </div>
+        </div>
+
+        <!-- Area Pilihan Ganda -->
+        <div id="options-container" class="grid grid-cols-2 gap-4">
+            <!-- Tombol pilihan akan dihasilkan (generated) oleh JS -->
+        </div>
+        
+        <!-- Score display (tersembunyi saat main, muncul di akhir) -->
+        <div id="score-display" class="hidden mt-4 font-bold text-xl text-green-600">
+            Skor Anda: <span id="score-value">0</span>
+        </div>
+    </div>
+
+    <!-- Layar Akhir (Selesai) -->
+    <div id="end-screen" class="game-container hidden">
+        <h1 class="text-4xl text-blue-600 mb-4">Hebat! 🎉</h1>
+        <p class="text-xl mb-6">Kamu telah menyelesaikan semua soal.</p>
+        
+        <div class="bg-gray-100 rounded-xl p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-700 mb-2">Nilai Akhir:</h2>
+            <div id="final-score" class="text-6xl text-green-500 font-black" style="font-family: 'Fredoka One', cursive;">
+                100
+            </div>
+        </div>
+        
+        <button onclick="startGame()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl text-xl transition-colors shadow-lg">
+            Main Lagi
+        </button>
+    </div>
+
+    <!-- Overlay Notifikasi (Muncul saat menjawab) -->
+    <div id="notification-overlay">
+        <div id="notification-box" class="notification-content">
+            <div id="notif-icon" class="text-6xl mb-2"></div>
+            <div id="notif-text" class="notification-text"></div>
+            <div id="notif-sub" class="notification-subtext"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data Soal Sesuai Permintaan
+        // 3+9, 7+9, 11+13, 8+6, 8+8
+        const questions = [
+            { text: "3 + 9", answer: 12, options: [11, 12, 13, 14] },
+            { text: "7 + 9", answer: 16, options: [15, 16, 17, 18] },
+            { text: "11 + 13", answer: 24, options: [22, 23, 24, 25] },
+            { text: "8 + 6", answer: 14, options: [12, 13, 14, 15] },
+            { text: "8 + 8", answer: 16, options: [14, 15, 16, 17] }
+        ];
+
+        // Variabel Status Permainan
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let canAnswer = true; // Mencegah spam klik saat animasi berjalan
+
+        // Elemen DOM
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+        const questionDisplay = document.getElementById('question-display');
+        const optionsContainer = document.getElementById('options-container');
+        const currentQuestionNumEl = document.getElementById('current-question-num');
+        const finalScoreEl = document.getElementById('final-score');
+        const notificationOverlay = document.getElementById('notification-overlay');
+        const notificationBox = document.getElementById('notification-box');
+        const notifText = document.getElementById('notif-text');
+        const notifSub = document.getElementById('notif-sub');
+        const notifIcon = document.getElementById('notif-icon');
+
+        // Fungsi untuk memulai/mengulang permainan
+        function startGame() {
+            currentQuestionIndex = 0;
+            score = 0;
+            
+            // Sembunyikan layar akhir, tampilkan layar game
+            endScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            
+            // Tambahkan animasi pop-in agar terasa segar
+            gameScreen.classList.remove('animate-pop-in');
+            void gameScreen.offsetWidth; // Trigger reflow
+            gameScreen.classList.add('animate-pop-in');
+
+            loadQuestion();
+        }
+
+        // Fungsi untuk mengacak array (Fisher-Yates) agar urutan pilihan berbeda
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Fungsi untuk memuat pertanyaan saat ini ke layar
+        function loadQuestion() {
+            canAnswer = true;
+            const currentQ = questions[currentQuestionIndex];
+            
+            // Update teks pertanyaan dan nomor urut
+            questionDisplay.textContent = currentQ.text;
+            currentQuestionNumEl.textContent = currentQuestionIndex + 1;
+            
+            // Bersihkan pilihan sebelumnya
+            optionsContainer.innerHTML = '';
+            
+            // Acak pilihan jawaban agar tidak selalu di posisi yang sama
+            const shuffledOptions = shuffleArray([...currentQ.options]);
+
+            // Buat tombol untuk setiap pilihan
+            shuffledOptions.forEach(option => {
+                const btn = document.createElement('button');
+                btn.textContent = option;
+                // Styling menggunakan Tailwind classes + custom class .option-btn
+                btn.className = 'option-btn bg-white border-4 border-blue-200 text-blue-700 font-bold text-3xl py-4 px-6 rounded-2xl hover:border-blue-400 hover:bg-blue-50 focus:outline-none';
+                
+                // Tambahkan event listener saat tombol diklik
+                btn.addEventListener('click', () => checkAnswer(option, btn));
+                
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        // Fungsi untuk mengecek jawaban pengguna
+        function checkAnswer(selectedOption, buttonElement) {
+            if (!canAnswer) return; // Jika sedang animasi, abaikan klik
+            canAnswer = false; // Kunci input sementara
+
+            const currentQ = questions[currentQuestionIndex];
+            const isCorrect = selectedOption === currentQ.answer;
+
+            if (isCorrect) {
+                // Jawaban Benar
+                score += 20; // 5 soal, masing-masing 20 poin = 100 max
+                
+                // Animasi pada tombol
+                buttonElement.classList.add('animate-success');
+                
+                // Tampilkan notifikasi "Selamat!"
+                showNotification(true);
+                
+                // Lanjut ke soal berikutnya setelah jeda singkat
+                setTimeout(() => {
+                    nextQuestion();
+                }, 1500); // Tunggu 1.5 detik
+            } else {
+                // Jawaban Salah
+                // Animasi goyang (shake) pada tombol merah
+                buttonElement.classList.add('animate-shake');
+                
+                // Tampilkan notifikasi "Masih Salah"
+                showNotification(false);
+                
+                // Hapus class animasi setelah selesai agar bisa diklik lagi (opsional, tapi di sini kita berikan kesempatan lagi)
+                // Karena instruksi tidak merinci apakah langsung lanjut atau coba lagi, 
+                // kita beri animasi saja lalu izinkan user memilih lagi (coba terus sampai benar)
+                setTimeout(() => {
+                    buttonElement.classList.remove('animate-shake');
+                    canAnswer = true; // Buka kunci input agar bisa coba lagi
+                }, 1500);
+            }
+        }
+
+        // Fungsi untuk menampilkan overlay animasi notifikasi
+        function showNotification(isSuccess) {
+            // Reset kelas tema
+            notificationBox.className = 'notification-content';
+            
+            if (isSuccess) {
+                notificationBox.classList.add('success-theme');
+                notifIcon.textContent = '🌟';
+                notifText.textContent = 'HEBAT!';
+                notifSub.textContent = 'Selamat Anda Dapat Seratus!'; // Sesuai permintaan
+            } else {
+                notificationBox.classList.add('error-theme');
+                notifIcon.textContent = '😅';
+                notifText.textContent = 'UPS!';
+                notifSub.textContent = 'Masih Salah, Coba Lagi!'; // Sesuai permintaan
+            }
+
+            // Tampilkan overlay
+            notificationOverlay.classList.add('show');
+
+            // Sembunyikan setelah 1.2 detik
+            setTimeout(() => {
+                notificationOverlay.classList.remove('show');
+            }, 1200);
+        }
+
+        // Fungsi untuk memajukan ke soal berikutnya atau mengakhiri permainan
+        function nextQuestion() {
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex < questions.length) {
+                // Tambahkan sedikit animasi transisi sebelum memuat soal baru
+                gameScreen.classList.remove('animate-pop-in');
+                void gameScreen.offsetWidth;
+                gameScreen.classList.add('animate-pop-in');
+                
+                loadQuestion();
+            } else {
+                showEndScreen();
+            }
+        }
+
+        // Fungsi untuk menampilkan layar hasil akhir
+        function showEndScreen() {
+            gameScreen.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+            
+            // Animasi pop-in untuk layar akhir
+            endScreen.classList.remove('animate-pop-in');
+            void endScreen.offsetWidth;
+            endScreen.classList.add('animate-pop-in');
+            
+            // Karena jika user salah mereka harus mencoba lagi sampai benar untuk lanjut,
+            // maka di akhir mereka pasti mendapat skor 100.
+            // Namun, untuk formalitas kita tetap set nilai skor.
+            finalScoreEl.textContent = "100"; 
+            
+            // Tambahan efek kecil jika 100
+            finalScoreEl.classList.add('animate-success');
+        }
+
+        // Mulai permainan saat halaman selesai dimuat
+        window.onload = startGame;
+    </script>
+</body>
+</html>
